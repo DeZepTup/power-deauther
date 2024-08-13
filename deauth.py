@@ -141,7 +141,7 @@ def deauth_process() -> None:
 
             start_time = time.time()
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1, channel)
+                future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1)
                 
                 while (time.time() - start_time) < args.channel_wait:
                     if future_scan.done():
@@ -160,7 +160,7 @@ def deauth_process() -> None:
                                             logger.info(f"Deauthing client {client} from BSSID {bssid} (SSID: {ssid})")
                                             executor.submit(send_deauth_packets, INTERFACE_MONITOR_2, target=client, bssid=bssid, reasons=args.deauth_reasons, seq=args.deauth_seq)
 
-                            future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1, channel)  # Resubmit the scanning task
+                            future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1)  # Resubmit the scanning task
                         except Exception as e:
                             logger.error(f"Error in future result: {e}")
 
