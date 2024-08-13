@@ -2,6 +2,7 @@ import argparse
 import subprocess
 import time
 import sys
+import os
 from typing import List, Tuple
 from loguru import logger
 import concurrent.futures
@@ -12,10 +13,15 @@ from scapy.layers.dot11 import RadioTap, Dot11, Dot11Deauth, Dot11Beacon, Dot11P
 INTERFACE_MONITOR_1 = "wlan1"
 INTERFACE_MONITOR_2 = "wlan2"
 
-
 # Remove default handler and configure loguru to log to stdout
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
+if DEBUG:
+    log_level = "DEBUG"
+else:
+    log_level = "INFO"
+
 logger.remove()
-logger.add(sys.stdout, format="{time} - {level} - {message}", level="INFO")
+logger.add(sys.stdout, format="{time} - {level} - {message}", level=log_level)
 
 
 # Initialize arguments
@@ -28,7 +34,7 @@ parser.add_argument("--blacklist_ap", nargs='+', default=[], help="List of ESSID
 parser.add_argument("--blacklist_client", nargs='+', default=[], help="List of client targets.")
 parser.add_argument("--attack_all", action='store_true', help="Allows to use empty blacklist lists and attacks all found, except for whitelist.")
 parser.add_argument("--channel_list", nargs='+', type=int, default=list(range(1, 14)) + list(range(36, 165, 4)), help="Channels to hop. Default includes all 2.4GHz and 5GHz channels.")
-parser.add_argument("--channel_wait", type=int, default=30, help="For how long to stay on a selected channel before hopping.")
+parser.add_argument("--channel_wait", type=int, default=32, help="For how long to stay on a selected channel before hopping.")
 parser.add_argument("--scan_wait", type=int, default=10, help="For how long to scan")
 args = parser.parse_args()
 
@@ -56,7 +62,7 @@ def set_channel(interface: str, channel: int) -> None:
     :param channel: The channel number to set.
     """
     try:
-        logger.info(f"Setting {interface} to channel {channel}")
+        logger.debug(f"Setting {interface} to channel {channel}")
         subprocess.run(["iwconfig", interface, "channel", str(channel)], check=True)
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to set channel {channel} on {interface}: {e}")
@@ -151,6 +157,7 @@ def deauth_process() -> None:
                             logger.info(f"Found {len(ap_list)} APs and {len(client_list)} clients on channel {channel}")
 
                             for ssid, bssid in ap_list:
+                                logger.debug(f"Checking if SSID:{ssid} BSSID:{bssid} should be deauthorized")
                                 if (bssid in args.whitelist_ap) or (ssid in args.whitelist_ap):
                                     continue
                                 if args.attack_all or (bssid.lower() in args.blacklist_ap or ssid in args.blacklist_ap):
@@ -165,7 +172,7 @@ def deauth_process() -> None:
                         except Exception as e:
                             logger.error(f"Error in future result: {e}")
 
-            logger.info(f"Finished operations for channel {channel}. Hopping to next channel.")
+            logger.info(f"Finished for channel {channel}. Hopping to next channel.")
 
 
 def main() -> None:
