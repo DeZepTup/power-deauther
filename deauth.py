@@ -26,7 +26,7 @@ logger.add(sys.stdout, format="{time} - {level} - {message}", level=log_level)
 
 # Initialize arguments
 parser = argparse.ArgumentParser(description="Deauth unwanted users from Wi-Fi network.")
-parser.add_argument("--deauth_reasons", nargs='+', type=int, default=[1, 2, 3, 4, 6, 7, 8, 10], help="List of deauth codes to be sent sequentially to the target.")
+parser.add_argument("--deauth_reasons", nargs='+', type=int, default=[1, 2, 3, 4, 6, 7, 8, 10], help="List of deauth codes to be sent sequentially to the target. Default all.")
 parser.add_argument("--deauth_seq", type=int, default=2, help="Number of packets for each reason to be sent at once.")
 parser.add_argument("--whitelist_ap", nargs='+', default=[], help="Ignore these ESSID or BSSID APs from attacking.")
 parser.add_argument("--whitelist_client", nargs='+', default=[], help="Ignore these clients from attacking.")
@@ -163,6 +163,7 @@ def deauth_process() -> None:
                                     logger.info(f"AP SSID:{ssid} BSSID:{bssid} is in whitelist")
                                     continue
                                 if args.attack_all_ap or (bssid.lower() in args.blacklist_ap or ssid in args.blacklist_ap):
+                                    logger.debug(f"Found AP SSID:{ssid} BSSID:{bssid} to attack")
                                     for client in client_list:
                                         logger.debug(f"Checking if Client:{client} should be deauthorized")
                                         if client in args.whitelist_client:
