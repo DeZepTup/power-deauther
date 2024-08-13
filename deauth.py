@@ -20,14 +20,14 @@ logger.add(sys.stdout, format="{time} - {level} - {message}", level="INFO")
 
 # Initialize arguments
 parser = argparse.ArgumentParser(description="Deauth unwanted users from Wi-Fi network.")
-parser.add_argument("--death_reasons", nargs='+', type=int, default=[1, 2, 3, 4, 6, 7, 8, 10], help="List of deauth codes to be sent sequentially to the target.")
-parser.add_argument("--death_seq", type=int, default=1, help="Number of packets for each reason to be sent at once.")
+parser.add_argument("--deauth_reasons", nargs='+', type=int, default=[1, 2, 3, 4, 6, 7, 8, 10], help="List of deauth codes to be sent sequentially to the target.")
+parser.add_argument("--deauth_seq", type=int, default=2, help="Number of packets for each reason to be sent at once.")
 parser.add_argument("--whitelist_ap", nargs='+', default=[], help="Ignore these ESSID or BSSID APs from attacking.")
 parser.add_argument("--whitelist_client", nargs='+', default=[], help="Ignore these clients from attacking.")
 parser.add_argument("--blacklist_ap", nargs='+', default=[], help="List of ESSID or BSSID AP targets.")
 parser.add_argument("--blacklist_client", nargs='+', default=[], help="List of client targets.")
 parser.add_argument("--attack_all", action='store_true', help="Allows to use empty blacklist lists and attacks all found, except for whitelist.")
-parser.add_argument("--channel_list", nargs='+', type=int, required=True, help="Channels to hop.")
+parser.add_argument("--channel_list", nargs='+', type=int, default=list(range(1, 14)) + list(range(36, 165, 4)), help="Channels to hop. Default includes all 2.4GHz and 5GHz channels.")
 parser.add_argument("--channel_wait", type=int, default=30, help="For how long to stay on a selected channel before hopping.")
 parser.add_argument("--scan_wait", type=int, default=10, help="For how long to scan")
 args = parser.parse_args()
@@ -158,7 +158,7 @@ def deauth_process() -> None:
                                             continue
                                         if args.attack_all or client in args.blacklist_client:
                                             logger.info(f"Deauthing client {client} from BSSID {bssid} (SSID: {ssid})")
-                                            executor.submit(send_deauth_packets, INTERFACE_MONITOR_2, target=client, bssid=bssid, reasons=args.death_reasons, seq=args.death_seq)
+                                            executor.submit(send_deauth_packets, INTERFACE_MONITOR_2, target=client, bssid=bssid, reasons=args.deauth_reasons, seq=args.deauth_seq)
 
                             future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1, channel)  # Resubmit the scanning task
                         except Exception as e:
