@@ -159,10 +159,13 @@ def deauth_process() -> None:
                             for ssid, bssid in ap_list:
                                 logger.debug(f"Checking if SSID:{ssid} BSSID:{bssid} should be deauthorized")
                                 if (bssid in args.whitelist_ap) or (ssid in args.whitelist_ap):
+                                    logger.info(f"AP SSID:{ssid} BSSID:{bssid} is in whitelist")
                                     continue
                                 if args.attack_all or (bssid.lower() in args.blacklist_ap or ssid in args.blacklist_ap):
                                     for client in client_list:
+                                        logger.debug(f"Checking if Client:{client} should be deauthorized")
                                         if client in args.whitelist_client:
+                                            logger.info(f"Client:{client} is in whitelist")
                                             continue
                                         if args.attack_all or client in args.blacklist_client:
                                             logger.info(f"Deauthing client {client} from BSSID {bssid} (SSID: {ssid})")
