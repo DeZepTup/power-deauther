@@ -143,6 +143,7 @@ def deauth_process() -> None:
 
     while True:
         for channel in args.channel_list:
+            channel = int(channel)
             logger.info(f"Switching to channel {channel}")
             set_channel(INTERFACE_MONITOR_1, channel)
             set_channel(INTERFACE_MONITOR_2, channel)
