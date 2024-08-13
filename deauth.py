@@ -41,9 +41,9 @@ def set_monitor_mode(interface: str) -> None:
     """
     try:
         logger.info(f"Setting {interface} to monitor mode")
-        subprocess.run(["sudo ifconfig", interface, "down"], check=True)
-        subprocess.run(["sudo iwconfig", interface, "mode", "monitor"], check=True)
-        subprocess.run(["sudo ifconfig", interface, "up"], check=True)
+        subprocess.run(["sudo", "ifconfig", interface, "down"], check=True)
+        subprocess.run(["sudo", "iwconfig", interface, "mode", "monitor"], check=True)
+        subprocess.run(["sudo", "ifconfig", interface, "up"], check=True)
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to set monitor mode on {interface}: {e}")
 
@@ -57,7 +57,7 @@ def set_channel(interface: str, channel: int) -> None:
     """
     try:
         logger.info(f"Setting {interface} to channel {channel}")
-        subprocess.run(["sudo iwconfig", interface, "channel", str(channel)], check=True)
+        subprocess.run(["sudo", "iwconfig", interface, "channel", str(channel)], check=True)
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to set channel {channel} on {interface}: {e}")
 
@@ -183,12 +183,12 @@ def main() -> None:
     finally:
         logger.info("Restoring network interfaces...")
         try:
-            subprocess.run(["sudo ifconfig", INTERFACE_MONITOR_1, "down"], check=True)
-            subprocess.run(["sudo iwconfig", INTERFACE_MONITOR_1, "mode", "managed"], check=True)
-            subprocess.run(["sudo ifconfig", INTERFACE_MONITOR_1, "up"], check=True)
-            subprocess.run(["sudo ifconfig", INTERFACE_MONITOR_2, "down"], check=True)
-            subprocess.run(["sudo iwconfig", INTERFACE_MONITOR_2, "mode", "managed"], check=True)
-            subprocess.run(["sudo ifconfig", INTERFACE_MONITOR_2, "up"], check=True)
+            subprocess.run(["sudo", "ifconfig", INTERFACE_MONITOR_1, "down"], check=True)
+            subprocess.run(["sudo", "iwconfig", INTERFACE_MONITOR_1, "mode", "managed"], check=True)
+            subprocess.run(["sudo", "ifconfig", INTERFACE_MONITOR_1, "up"], check=True)
+            subprocess.run(["sudo", "ifconfig", INTERFACE_MONITOR_2, "down"], check=True)
+            subprocess.run(["sudo", "iwconfig", INTERFACE_MONITOR_2, "mode", "managed"], check=True)
+            subprocess.run(["sudo", "ifconfig", INTERFACE_MONITOR_2, "up"], check=True)
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to restore network interfaces: {e}")
 
