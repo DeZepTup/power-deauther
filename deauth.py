@@ -169,6 +169,9 @@ def attacking_task() -> None:
     while True:
         for bssid, (ssid, clients, channel) in list(targets_dict.items()):
             # logger.debug(f"Checking AP SSID:{ssid} BSSID:{bssid} on channel {channel} with clients {clients}")
+            # Skip if this channel is not selected
+            if channel not in args.channel_list:
+                continue
             # Skip if there is no clients on AP
             if not clients: 
                 # logger.debug(f"No clients on AP SSID:{ssid} BSSID:{bssid}")
