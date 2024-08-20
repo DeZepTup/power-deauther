@@ -85,15 +85,14 @@ def set_channel(interface: str, channel: int) -> None:
 def scan_networks(interface: str, scan_wait: int, channel: int) -> None:
     """Scans for networks and connected clients on the specified interface and updates the shared dictionary."""
     global targets_dict
-
     def packet_handler(pkt):
         if pkt.haslayer(Dot11):
             if pkt.type == 0 and (pkt.subtype == 8 or pkt.subtype == 5):  # Beacon or Probe Response
                 ssid = pkt[Dot11Elt].info.decode(errors="ignore") if pkt.haslayer(Dot11Elt) else ""
                 bssid = pkt.addr2.lower() if pkt.addr2 else ''
-                # channel = int(ord(pkt[Dot11Elt:3].info)) if pkt.haslayer(Dot11Elt) else 0
+                channel = int(ord(pkt[Dot11Elt:3].info)) if pkt.haslayer(Dot11Elt) else 0
 
-                if bssid: # and channel:
+                if bssid and channel:
                     if bssid not in targets_dict:
                         targets_dict[bssid] = (ssid, [], channel)
             elif pkt.type == 0 and pkt.subtype in {0, 2}:  # Association Request, Reassociation Request
@@ -169,7 +168,7 @@ def attacking_task() -> None:
     """Attacking task to be run by thread 2"""
     while True:
         for bssid, (ssid, clients, channel) in list(targets_dict.items()):
-            logger.debug(f"Checking AP SSID:{ssid} BSSID:{bssid} on channel {channel} with clients {clients}")
+            # logger.debug(f"Checking AP SSID:{ssid} BSSID:{bssid} on channel {channel} with clients {clients}")
             # Skip if there is no clients on AP
             if not clients: 
                 # logger.debug(f"No clients on AP SSID:{ssid} BSSID:{bssid}")
