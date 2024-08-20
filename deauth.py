@@ -40,7 +40,7 @@ def lower_case(value):
 
 # Initialize arguments
 parser = argparse.ArgumentParser(description="Deauth unwanted users from Wi-Fi network.")
-parser.add_argument("--deauth_reasons", nargs='+', default=[1, 2, 3, 4, 6, 7, 8, 10], help="List of deauth codes to be sent sequentially to the target. Default all.")
+parser.add_argument("--deauth_reasons", nargs='+', default=[1, 2, 3, 4, 6, 7, 8, 10], help="List of deauth codes to be sent sequentially to the target. Default all: [1, 2, 3, 4, 6, 7, 8, 10]")
 parser.add_argument("--deauth_seq", type=int, default=50, help="Number of packets for each reason to be sent at once.")
 parser.add_argument("--whitelist_ap", type=lower_case, nargs='+', default=[], help="Ignore these ESSID or BSSID APs from attacking.")
 parser.add_argument("--whitelist_client", type=lower_case, nargs='+', default=[], help="Ignore these clients from attacking.")
@@ -49,7 +49,7 @@ parser.add_argument("--blacklist_client", type=lower_case, nargs='+', default=[]
 parser.add_argument("--attack_all_ap", action='store_true', help="Allows to use empty blacklist lists and attacks all found AP, except for whitelist.")
 parser.add_argument("--attack_all_client", action='store_true', help="Allows to use empty blacklist lists and attacks all found Clients, except for whitelist.")
 parser.add_argument("--channel_list", nargs='+', default=list(range(1, 14)) + list(range(36, 165, 4)), help="Channels to hop. Default includes all 2.4GHz and 5GHz channels.")
-parser.add_argument("--scan_wait", type=int, default=10, help="For how long to scan")
+parser.add_argument("--scan_wait", type=int, default=30, help="For how long to scan")
 args = parser.parse_args()
 
 
